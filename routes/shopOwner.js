@@ -6,12 +6,13 @@ const router = express.Router();
 // Add product to inventory
 router.post('/inventory', async (req, res) => {
   try {
-    const { owner, productId, price, quantity } = req.body;
+    const {productId, price, quantity,productName } = req.body;
+    const owner = req.user.email;
     const product = await Product.findOne({ productId });
     if (!product) {
       return res.status(404).json({ message: 'Product not found', status: 0 });
     }
-    const inventoryItem = new Inventory({ owner, productId, price, quantity });
+    const inventoryItem = new Inventory({ owner, productId, price, quantity, productName });
     await inventoryItem.save();
     res.status(201).json({message:"Product added to inventory",product:inventoryItem, status:1});
   } catch (err) {
@@ -20,34 +21,87 @@ router.post('/inventory', async (req, res) => {
 });
 
 // Get all inventory items for a shop owner
-router.get('/inventory/:ownerId', async (req, res) => {
+router.get('/inventory', async (req, res) => {
   try {
-    const inventory = await Inventory.find({ owner: req.params.ownerId }).populate('product');
+    const owner = req.user.email;
+    const inventory = await Inventory.find({ owner: owner }).populate('product');
     res.json({message:"Product Fetched from inventory",products:inventory,status:1});
   } catch (err) {
     res.status(500).json({ msg: err.message, status:0 });
   }
 });
 
-// Update inventory item (price and quantity)
-router.put('/inventory/:id', async (req, res) => {
+// Get all the products added by admin
+router.get('/products', async (req, res) => {
   try {
-    const { price, quantity } = req.body;
-    const inventoryItem = await Inventory.findByIdAndUpdate(req.params.id, { price, quantity }, { new: true });
-    res.json({message:"Product updated inventory",product: inventoryItem, status:1});
+    const products = await Product.find();
+    res.json({message:"Product Fetched successfully", products:products, status:1});
   } catch (err) {
-    res.status(500).json({ msg: err.message, status:0 });
+    res.status(500).json({ msg: err.message,status:0  });
   }
 });
 
-// Delete an inventory item
-router.delete('/inventory/:id', async (req, res) => {
+// Get a single inventory item by productId
+router.get('/inventory/:productId', async (req, res) => {
   try {
-    await Inventory.findByIdAndDelete(req.params.id);
-    res.json({ msg: 'Inventory item deleted',status:1 });
+    const owner = req.user.email;
+    // Find inventory item by productId
+    const inventoryItem = await Inventory.findOne({ productId: req.params.productId, owner: owner  });
+
+    if (!inventoryItem) {
+      return res.status(404).json({ message: "Inventory item not found", status: 0 });
+    }
+
+    res.json({ message: "Inventory item fetched successfully", product: inventoryItem, status: 1 });
   } catch (err) {
-    res.status(500).json({ msg: err.message, status:0 });
+    res.status(500).json({ msg: err.message, status: 0 });
   }
 });
+
+
+// Update inventory item by productId (price and quantity)
+router.put('/inventory/:productId', async (req, res) => {
+  try {
+    const { price, quantity,productName } = req.body;
+    const owner = req.user.email;
+
+    // Find inventory item by productId and update
+    const inventoryItem = await Inventory.findOneAndUpdate(
+      { productId: req.params.productId ,  owner: owner },
+      { price, quantity , productName},
+      { new: true }
+    );
+
+    if (!inventoryItem) {
+      return res.status(404).json({ message: "Inventory item not found", status: 0 });
+    }
+
+    res.json({ message: "Product updated in inventory", product: inventoryItem, status: 1 });
+  } catch (err) {
+    res.status(500).json({ msg: err.message, status: 0 });
+  }
+});
+
+// Delete an inventory item by productId
+router.delete('/inventory/:productId', async (req, res) => {
+  try {
+    const owner = req.user.email;
+    // Find and delete the inventory item by productId
+    const inventoryItem = await Inventory.findOneAndDelete({ productId: req.params.productId, owner: owner });
+
+    if (!inventoryItem) {
+      return res.status(404).json({ message: "Inventory item not found", status: 0 });
+    }
+
+    res.json({ msg: 'Inventory item deleted', status: 1 });
+  } catch (err) {
+    res.status(500).json({ msg: err.message, status: 0 });
+  }
+});
+
+
+
+
+
 
 module.exports = router;
